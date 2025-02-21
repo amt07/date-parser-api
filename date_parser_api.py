@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 import dateparser
-import pytz
+from datetime import datetime, time
+import os
 
 app = Flask(__name__)
 
@@ -11,25 +12,29 @@ def parse_date():
     if not date_text:
         return jsonify({"error": "No date provided"}), 400
 
-    # Parse date & time with timezone support
+    # Enable relative date parsing
     parsed_date = dateparser.parse(
         date_text,
-        settings={'TIMEZONE': 'UTC', 'TO_TIMEZONE': 'Asia/Kolkata', 'PREFER_DATES_FROM': 'future'}
+        settings={
+            'RELATIVE_BASE': datetime.now(),  
+            'PREFER_DATES_FROM': 'future',    
+            'PARSERS': ['relative-time', 'absolute-time'],  
+        }
     )
 
     if parsed_date:
-        # Format outputs for different use cases
-        formatted_iso = parsed_date.isoformat()  # ISO 8601 format
-        formatted_12hr = parsed_date.strftime('%Y-%m-%d %I:%M %p %Z')  # 12-hour format
-        formatted_24hr = parsed_date.strftime('%Y-%m-%d %H:%M %Z')  # 24-hour format
+        # Default to 12:00 PM if no time is provided
+        if parsed_date.time() == time(0, 0):  
+            parsed_date = parsed_date.replace(hour=12, minute=0)
 
         return jsonify({
-            "parsed_date_iso": formatted_iso,
-            "formatted_12hr": formatted_12hr,
-            "formatted_24hr": formatted_24hr
+            "parsed_date_iso": parsed_date.isoformat(),
+            "formatted_12hr": parsed_date.strftime('%Y-%m-%d %I:%M %p'),
+            "formatted_24hr": parsed_date.strftime('%Y-%m-%d %H:%M')
         })
     else:
         return jsonify({"error": "Invalid date format"}), 400
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))  # Get PORT from environment
+    app.run(host="0.0.0.0", port=port, debug=True)
